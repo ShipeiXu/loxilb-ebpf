@@ -7,6 +7,7 @@ XDP_DEPS := llb_kern_devif.c      \
             llb_kern_natlbfwd.c   \
             llb_kern_policer.c    \
             llb_kern_fcfwd.c      \
+            llb_kern_dns.c        \
             llb_kern_entry.c      \
             llb_kern_ct.c
 

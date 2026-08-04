@@ -1561,6 +1561,18 @@ llb_xh_init(llb_dp_struct_t *xh)
   xh->maps[LL_DP_SOCK_PROXY_MAP].has_pb   = 0;
   xh->maps[LL_DP_SOCK_PROXY_MAP].max_entries = LLB_SOCK_MAP_SZ;
 
+  xh->maps[LL_DP_DNS_TRIE_MAP].map_name = "dns_trie_map";
+  xh->maps[LL_DP_DNS_TRIE_MAP].has_pb = 1;
+  xh->maps[LL_DP_DNS_TRIE_MAP].pb_xtid = LL_DP_DNS_STATS_MAP;
+  xh->maps[LL_DP_DNS_TRIE_MAP].max_entries = LLB_DNS_MAP_ENTRIES;
+
+  xh->maps[LL_DP_DNS_STATS_MAP].map_name = "dns_stats_map";
+  xh->maps[LL_DP_DNS_STATS_MAP].has_pb = 1;
+  xh->maps[LL_DP_DNS_STATS_MAP].max_entries = LLB_DNS_MAP_ENTRIES;
+  xh->maps[LL_DP_DNS_STATS_MAP].pbs = calloc(LLB_DNS_MAP_ENTRIES,
+                                             sizeof(struct dp_pbc_stats));
+  assert(xh->maps[LL_DP_DNS_STATS_MAP].pbs);
+
   strcpy(xh->psecs[0].name, LLB_SECTION_PASS);
   strcpy(xh->psecs[1].name, XDP_LL_SEC_DEFAULT);
   xh->psecs[1].setup = llb_dflt_sec_map2fd_all;
@@ -2100,6 +2112,9 @@ llb_dp_pdiop2_ufwa(struct pdi_rule *new, struct dp_fw_tact *fwa)
   case PDI_SET_FWD:
     fwa->ca.act_type = DP_SET_NOP;
     break;
+  case PDI_SET_DNS:
+    fwa->ca.act_type = DP_SET_DNS_PARSE;
+    break;
   default:
     break;
   }
@@ -2126,6 +2141,10 @@ llb_dp_ufw2pdiop(struct pdi_rule *new, struct dp_fw_tact *fwa)
     break;
   case DP_SET_NOP:
     new->data.op = PDI_SET_FWD;
+    break;
+  case DP_SET_DNS_PARSE:
+    new->data.op = PDI_SET_DNS;
+    break;
   default:
     break; 
   }
@@ -2291,6 +2310,7 @@ llb_add_map_elem(int tbl, void *k, void *v)
       tbl == LL_DP_TMAC_MAP ||
       tbl == LL_DP_FW4_MAP  ||
       tbl == LL_DP_FW6_MAP  ||
+      tbl == LL_DP_DNS_TRIE_MAP ||
       tbl == LL_DP_RTV4_MAP) {
     __u32 cidx = 0;
 

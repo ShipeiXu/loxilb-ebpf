@@ -74,6 +74,7 @@ struct pdi_gen_key {
 #define PDI_SET_FWD    0x20
 #define PDI_SET_TRAP   0x40
 #define PDI_SET_RDR    0x80
+#define PDI_SET_DNS    0x100
 
 struct pdi_opts {
   uint32_t qfi;

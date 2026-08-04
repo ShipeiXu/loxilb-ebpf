@@ -113,6 +113,13 @@ dp_do_fw4_main(void *ctx, struct xfi *xf)
     xf->pm.oport = ar->oport;
   } else if (act->ca.act_type == DP_SET_TOCP) {
     LLBS_PPLN_PASSC(xf, LLB_PIPE_RC_FW_RDR);
+  } else if (act->ca.act_type == DP_SET_DNS_PARSE) {
+    int dns_act = dp_check_dns_policy(ctx, xf);
+    if (dns_act == DNS_POLICY_CONTINUE) {
+      /* DNS policy is an overlay; continue with the next firewall rule. */
+      xf->pm.fw_lid = idx;
+    }
+    goto done;
   } else {
     /* Same for DP_SET_DROP */
     LLBS_PPLN_DROPC(xf, LLB_PIPE_RC_ACT_UNK);
@@ -215,6 +222,13 @@ dp_do_fw6_main(void *ctx, struct xfi *xf)
     xf->pm.oport = ar->oport;
   } else if (act->ca.act_type == DP_SET_TOCP) {
     LLBS_PPLN_PASSC(xf, LLB_PIPE_RC_FW_RDR);
+  } else if (act->ca.act_type == DP_SET_DNS_PARSE) {
+    int dns_act = dp_check_dns_policy(ctx, xf);
+    if (dns_act == DNS_POLICY_CONTINUE) {
+      /* DNS policy is an overlay; continue with the next firewall rule. */
+      xf->pm.fw_lid = idx;
+    }
+    goto done;
   } else {
     /* Same for DP_SET_DROP */
     LLBS_PPLN_DROPC(xf, LLB_PIPE_RC_ACT_UNK);

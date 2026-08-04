@@ -20,6 +20,7 @@
 #include "llb_kern_compose.c"
 #include "llb_kern_policer.c"
 #include "llb_kern_sessfwd.c"
+#include "llb_kern_dns.c"
 #include "llb_kern_fw.c"
 #include "llb_kern_natlbfwd.c"
 #include "llb_kern_ct.c"

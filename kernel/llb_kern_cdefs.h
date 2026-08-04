@@ -319,6 +319,21 @@ struct bpf_map_def SEC("maps") xfck = {
   .max_entries = 1,
 };
 
+struct bpf_map_def SEC("maps") dns_trie_map = {
+  .type = BPF_MAP_TYPE_LPM_TRIE,
+  .key_size = sizeof(struct dp_dns_key),
+  .value_size = sizeof(struct dp_fw_tact),
+  .map_flags = BPF_F_NO_PREALLOC,
+  .max_entries = LLB_DNS_MAP_ENTRIES
+};
+
+struct bpf_map_def SEC("maps") dns_stats_map = {
+  .type = BPF_MAP_TYPE_PERCPU_ARRAY,
+  .key_size = sizeof(__u32),
+  .value_size = sizeof(struct dp_pb_stats),
+  .max_entries = LLB_DNS_MAP_ENTRIES
+};
+
 #else /* New BTF definitions */
 
 struct intf_map_d {
@@ -610,6 +625,21 @@ struct xctk_d {
         __uint(max_entries, 2);
 } xctk SEC(".maps");
 
+struct dns_trie_map_d {
+        __uint(type,        BPF_MAP_TYPE_LPM_TRIE);
+        __type(key,         struct dp_dns_key);
+        __type(value,       struct dp_fw_tact);
+        __uint(map_flags,   BPF_F_NO_PREALLOC);
+        __uint(max_entries, LLB_DNS_MAP_ENTRIES);
+} dns_trie_map SEC(".maps");
+
+struct dns_stats_map_d {
+        __uint(type,        BPF_MAP_TYPE_PERCPU_ARRAY);
+        __type(key,         __u32);
+        __type(value,       struct dp_pb_stats);
+        __uint(max_entries, LLB_DNS_MAP_ENTRIES);
+} dns_stats_map SEC(".maps");
+
 
 #endif
 
@@ -660,6 +690,9 @@ dp_do_map_stats(void *ctx,
     break;
   case LL_DP_PPLAT_MAP:
     map = &pplat_map;
+    break;
+  case LL_DP_DNS_STATS_MAP:
+    map = &dns_stats_map;
     break;
   default:
     return;

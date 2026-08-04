@@ -39,6 +39,7 @@
 #define LLB_PORT_PIDX_START   (LLB_PORT_NO - 128)
 #define LLB_INTF_MAP_ENTRIES  (6*1024)
 #define LLB_FCV4_MAP_ENTRIES  (LLB_CT_MAP_ENTRIES)
+#define LLB_DNS_MAP_ENTRIES   (4096)
 #define LLB_PGM_MAP_ENTRIES   (8)
 #define LLB_FCV4_MAP_ACTS     (DP_SET_TOCP+1)
 #define LLB_POL_MAP_ENTRIES   (8*1024)
@@ -151,6 +152,8 @@ enum llb_dp_tid {
   LL_DP_NAT_EP_MAP,
   LL_DP_SOCK_RWR_MAP,
   LL_DP_SOCK_PROXY_MAP,
+  LL_DP_DNS_TRIE_MAP,
+  LL_DP_DNS_STATS_MAP,
   LL_DP_MAX_MAP
 };
 
@@ -182,7 +185,8 @@ enum {
   DP_SET_RM_IPIP         = 24,
   DP_SET_NACT_SESS       = 25,
   DP_SET_FULLPROXY       = 27,
-  DP_SET_RT_NHNUM_DFLT   = 28
+  DP_SET_RT_NHNUM_DFLT   = 28,
+  DP_SET_DNS_PARSE       = 29
 };
 
 struct dp_cmn_act {
@@ -295,7 +299,7 @@ struct dp_nh_tact {
 struct dp_rtv6_key {
   struct bpf_lpm_trie_key l;
   union {
-    __u32 addr[4]; 
+    __u32 addr[4];
   };
 }__attribute__((packed));
 
@@ -303,8 +307,13 @@ struct dp_rtv4_key {
   struct bpf_lpm_trie_key l;
   union {
     __u8  v4k[6];
-    __u32 addr; 
+    __u32 addr;
   };
+}__attribute__((packed));
+
+struct dp_dns_key {
+  struct bpf_lpm_trie_key l;
+  __u8  domain[256];
 }__attribute__((packed));
 
 struct dp_rt_tact {
