@@ -1255,6 +1255,10 @@ dp_ins_ppv2(void *md, struct xfi *xf)
 
 
     ntcp = DP_ADD_PTR(DP_PDATA(md), xf->pm.l4_off);
+    /* Keep a separate destination check: the verifier cannot infer it from
+     * the checked source at l4_off + len after compiler simplification.
+     */
+    barrier_var(ntcp);
     if (ntcp + 1 > dend) {
       LLBS_PPLN_DROPC(xf, LLB_PIPE_RC_PLERR);
       return -1;
@@ -1361,6 +1365,8 @@ dp_ins_ppv2(void *md, struct xfi *xf)
     __u16 new_len = bpf_htons(bpf_ntohs(old_len) + len);
 
     nudp = DP_ADD_PTR(DP_PDATA(md), xf->pm.l4_off);
+    /* Preserve the destination bounds check independently of udp's check. */
+    barrier_var(nudp);
     if (nudp + 1 > dend) {
       LLBS_PPLN_DROPC(xf, LLB_PIPE_RC_PLERR);
       return -1;
