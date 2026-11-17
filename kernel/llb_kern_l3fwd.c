@@ -125,8 +125,12 @@ dp_do_rtops(void *ctx, struct xfi *xf, void *fa_, struct dp_rt_tact *act)
     struct dp_rt_nh_act *rnh = &act->rt_nh;
 
     if (rnh->naps > 1) {
-      int sel = dp_get_pkt_hash(ctx) % rnh->naps;
-      if (sel >= 0 && sel < DP_MAX_ACTIVE_PATHS) {
+      __u64 sel = dp_get_pkt_hash(ctx) % rnh->naps;
+      /* Keep the bounds check 64-bit for the map-value pointer arithmetic.
+       * Older verifiers may not propagate a 32-bit check to the upper bits.
+       */
+      barrier_var(sel);
+      if (sel < DP_MAX_ACTIVE_PATHS) {
         xf->pm.nh_num = rnh->nh_num[sel];
       }
     } else {
