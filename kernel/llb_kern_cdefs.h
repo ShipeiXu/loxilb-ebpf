@@ -61,6 +61,15 @@ struct ll_xmdi {
 #define LLB_SKB_FIXUP_LEN 1000
 #define LLB_SKB_MIN_DPA_LEN 80
 
+#define LLB_DNS_MAX_LABELS 32
+
+/* DNS parsing runs inline with firewall lookup; keep its buffers off-stack. */
+struct dp_dns_scratch {
+  struct dp_dns_key key;
+  __u16 label_off[LLB_DNS_MAX_LABELS];
+  __u8 label_len[LLB_DNS_MAX_LABELS];
+};
+
 #ifdef HAVE_LEGACY_BPF_MAPS
 
 struct bpf_map_def SEC("maps") intf_map = {
@@ -316,6 +325,13 @@ struct bpf_map_def SEC("maps") xfck = {
   .type = BPF_MAP_TYPE_PERCPU_ARRAY,
   .key_size = sizeof(int),  /* Index CPU idx */
   .value_size = sizeof(struct dp_fcv4_key),
+  .max_entries = 1,
+};
+
+struct bpf_map_def SEC("maps") dns_scratch = {
+  .type = BPF_MAP_TYPE_PERCPU_ARRAY,
+  .key_size = sizeof(__u32),
+  .value_size = sizeof(struct dp_dns_scratch),
   .max_entries = 1,
 };
 
@@ -624,6 +640,13 @@ struct xctk_d {
         __type(value,       struct dp_ct_tact_scratch);
         __uint(max_entries, 2);
 } xctk SEC(".maps");
+
+struct dns_scratch_d {
+        __uint(type,        BPF_MAP_TYPE_PERCPU_ARRAY);
+        __type(key,         __u32);
+        __type(value,       struct dp_dns_scratch);
+        __uint(max_entries, 1);
+} dns_scratch SEC(".maps");
 
 struct dns_trie_map_d {
         __uint(type,        BPF_MAP_TYPE_LPM_TRIE);

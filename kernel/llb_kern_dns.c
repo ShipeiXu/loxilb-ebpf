@@ -20,20 +20,21 @@
 #define DNS_POLICY_TRAP     2
 
 static __always_inline int
-dp_parse_dns_qname(void *data, void *data_end, __u16 off, struct dp_dns_key *key)
+dp_parse_dns_qname(void *data, void *data_end, __u16 off,
+                   struct dp_dns_scratch *scratch)
 {
+  struct dp_dns_key *key = &scratch->key;
   __u8 *pos = data + off;
-  __u16 label_off[32] = { 0 };
-  __u8 label_len[32] = { 0 };
   __u16 out = 0;
   int labels = 0;
   int terminated = 0;
   int i, j;
   __u8 len;
 
+  /* Keep bounded loops: forced expansion bloats the inlined firewall program. */
   /* First validate QNAME and remember each label's location. */
-  #pragma unroll
-  for (i = 0; i < 32; i++) {
+  #pragma clang loop unroll(disable)
+  for (i = 0; i < LLB_DNS_MAX_LABELS; i++) {
     if (pos + 1 > data_end) return -1;
     len = *pos;
     if (len == 0) {
@@ -44,8 +45,8 @@ dp_parse_dns_qname(void *data, void *data_end, __u16 off, struct dp_dns_key *key
     pos++;
 
     if (pos + len > data_end) return -1;
-    label_off[i] = (__u16)(pos - (__u8 *)data);
-    label_len[i] = len;
+    scratch->label_off[i] = (__u16)(pos - (__u8 *)data);
+    scratch->label_len[i] = len;
     labels = i + 1;
     pos += len;
   }
@@ -53,27 +54,28 @@ dp_parse_dns_qname(void *data, void *data_end, __u16 off, struct dp_dns_key *key
   if (!terminated || labels == 0) return -1;
 
   /* Reverse labels so an LPM prefix represents a DNS suffix. */
-  #pragma unroll
-  for (i = 0; i < 32; i++) {
+  #pragma clang loop unroll(disable)
+  for (i = 0; i < LLB_DNS_MAX_LABELS; i++) {
     int label_idx;
     __u8 *label;
 
     if (i >= labels) break;
     label_idx = labels - i - 1;
-    if (label_idx < 0 || label_idx >= 32) return -1;
-    len = label_len[label_idx];
-    label = (__u8 *)data + label_off[label_idx];
+    if (label_idx < 0 || label_idx >= LLB_DNS_MAX_LABELS) return -1;
+    len = scratch->label_len[label_idx];
+    /* Re-establish bounds after reading the per-CPU map value. */
+    if (len == 0 || len > 63) return -1;
+    label = (__u8 *)data + scratch->label_off[label_idx];
 
-    #pragma unroll
+    #pragma clang loop unroll(disable)
     for (j = 0; j < 64; j++) {
-      if (j < len) {
-        __u8 c;
-        if (label + j + 1 > data_end || out >= sizeof(key->domain) - 1)
-          return -1;
-        c = *(label + j);
-        if (c >= 'A' && c <= 'Z') c += 'a' - 'A';
-        key->domain[out++] = c;
-      }
+      __u8 c;
+      if (j >= len) break;
+      if (label + j + 1 > data_end || out >= sizeof(key->domain) - 1)
+        return -1;
+      c = *(label + j);
+      if (c >= 'A' && c <= 'Z') c += 'a' - 'A';
+      key->domain[out++] = c;
     }
     if (out >= sizeof(key->domain) - 1) return -1;
     key->domain[out++] = '.';
@@ -87,7 +89,8 @@ dp_parse_dns_qname(void *data, void *data_end, __u16 off, struct dp_dns_key *key
 static __always_inline int
 dp_check_dns_policy(void *ctx, struct xfi *xf)
 {
-  struct dp_dns_key key;
+  __u32 scratch_idx = 0;
+  struct dp_dns_scratch *scratch;
   struct dp_fw_tact *act;
   void *data = DP_TC_PTR(DP_PDATA(ctx));
   void *data_end = DP_TC_PTR(DP_PDATA_END(ctx));
@@ -98,12 +101,18 @@ dp_check_dns_policy(void *ctx, struct xfi *xf)
     return DNS_POLICY_CONTINUE;
   }
 
-  memset(&key, 0, sizeof(key));
-  if (dp_parse_dns_qname(data, data_end, off, &key) < 0) {
+  scratch = bpf_map_lookup_elem(&dns_scratch, &scratch_idx);
+  if (!scratch) {
     return DNS_POLICY_CONTINUE;
   }
 
-  act = bpf_map_lookup_elem(&dns_trie_map, &key);
+  /* Clear the full trie key on reuse. Label slots are written before reading. */
+  memset(&scratch->key, 0, sizeof(scratch->key));
+  if (dp_parse_dns_qname(data, data_end, off, scratch) < 0) {
+    return DNS_POLICY_CONTINUE;
+  }
+
+  act = bpf_map_lookup_elem(&dns_trie_map, &scratch->key);
   if (act) {
     dp_do_map_stats(ctx, xf, LL_DP_DNS_STATS_MAP, act->ca.cidx);
     if (act->ca.act_type == DP_SET_DROP) {
